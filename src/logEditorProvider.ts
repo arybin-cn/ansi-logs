@@ -32,7 +32,7 @@ interface PanelState {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export class LogEditorProvider implements vscode.CustomEditorProvider<LogDocument> {
-    public static readonly viewType = 'logLens.logViewer';
+    public static readonly viewType = 'ansiLogs.logViewer';
 
     private readonly _onDidChangeCustomDocument =
         new vscode.EventEmitter<vscode.CustomDocumentContentChangeEvent<LogDocument>>();
@@ -213,7 +213,7 @@ export class LogEditorProvider implements vscode.CustomEditorProvider<LogDocumen
     }
 
     private sendInit(uri: vscode.Uri, state: PanelState): void {
-        const cfg = vscode.workspace.getConfiguration('logLens');
+        const cfg = vscode.workspace.getConfiguration('ansiLogs');
         const fr = state.fileReader;
         state.panel.webview.postMessage({
             type: 'init',
@@ -432,7 +432,7 @@ export class LogEditorProvider implements vscode.CustomEditorProvider<LogDocumen
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link rel="stylesheet" href="${styleUri}">
-<title>Log Lens</title>
+<title>ANSI Logs</title>
 </head>
 <body>
 <div id="toolbar">

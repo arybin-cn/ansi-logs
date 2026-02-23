@@ -1,4 +1,4 @@
-# Log Lens
+# ANSI Logs
 
 **High-performance ANSI log viewer for VS Code** — beautifully renders colored log files, handles 2M+ line files without breaking a sweat.
 
@@ -16,7 +16,7 @@
 
 ## Usage
 
-Open any `.log` file — Log Lens activates automatically as the default viewer.
+Open any `.log` file — ANSI Logs activates automatically as the default viewer.
 
 | Action | How |
 |--------|-----|
@@ -32,14 +32,14 @@ Open any `.log` file — Log Lens activates automatically as the default viewer.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `logLens.lineHeight` | `22` | Row height in pixels |
-| `logLens.fontSize` | `13` | Font size in pixels |
-| `logLens.fontFamily` | `""` | Font family (empty = VS Code editor font) |
-| `logLens.renderBuffer` | `100` | Extra rows rendered outside visible area |
+| `ansiLogs.lineHeight` | `22` | Row height in pixels |
+| `ansiLogs.fontSize` | `13` | Font size in pixels |
+| `ansiLogs.fontFamily` | `""` | Font family (empty = VS Code editor font) |
+| `ansiLogs.renderBuffer` | `100` | Extra rows rendered outside visible area |
 
 ## Performance
 
-Log Lens uses a streaming file scanner that builds a byte-offset index without loading the entire file into memory:
+ANSI Logs uses a streaming file scanner that builds a byte-offset index without loading the entire file into memory:
 
 - A 62 MB log file scans in ~1 second
 - Memory usage: ~8 MB per million lines (offset index only)

@@ -1,6 +1,6 @@
 {
-  "name": "log-lens",
-  "displayName": "Log Lens",
+  "name": "ansi-logs",
+  "displayName": "ANSI Logs",
   "description": "High-performance ANSI log viewer with virtual scrolling, log-level filtering, inline editing, grep filter, and tail-follow. Handles 2M+ line log files with ease.",
   "version": "0.1.0",
   "publisher": "bartag",
@@ -8,12 +8,12 @@
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bartag/log-lens"
+    "url": "https://github.com/bartag/ansi-logs"
   },
   "bugs": {
-    "url": "https://github.com/bartag/log-lens/issues"
+    "url": "https://github.com/bartag/ansi-logs/issues"
   },
-  "homepage": "https://github.com/bartag/log-lens#readme",
+  "homepage": "https://github.com/bartag/ansi-logs#readme",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -23,8 +23,8 @@
   "contributes": {
     "customEditors": [
       {
-        "viewType": "logLens.logViewer",
-        "displayName": "Log Lens",
+        "viewType": "ansiLogs.logViewer",
+        "displayName": "ANSI Logs",
         "selector": [
           { "filenamePattern": "*.log" },
           { "filenamePattern": "*.log.*" }
@@ -34,33 +34,33 @@
     ],
     "commands": [
       {
-        "command": "logLens.openRaw",
-        "title": "Log Lens: Open as Text Editor"
+        "command": "ansiLogs.openRaw",
+        "title": "ANSI Logs: Open as Text Editor"
       },
       {
-        "command": "logLens.toggleViewer",
-        "title": "Log Lens: Toggle Log Viewer"
+        "command": "ansiLogs.toggleViewer",
+        "title": "ANSI Logs: Toggle Log Viewer"
       }
     ],
     "configuration": {
-      "title": "Log Lens",
+      "title": "ANSI Logs",
       "properties": {
-        "logLens.lineHeight": {
+        "ansiLogs.lineHeight": {
           "type": "number",
           "default": 22,
           "description": "Line height in pixels for the log viewer"
         },
-        "logLens.fontSize": {
+        "ansiLogs.fontSize": {
           "type": "number",
           "default": 13,
           "description": "Font size in pixels for the log viewer"
         },
-        "logLens.fontFamily": {
+        "ansiLogs.fontFamily": {
           "type": "string",
           "default": "",
           "description": "Font family override (leave empty to use VS Code editor font)"
         },
-        "logLens.renderBuffer": {
+        "ansiLogs.renderBuffer": {
           "type": "number",
           "default": 100,
           "description": "Number of extra lines to render above/below the visible area"
