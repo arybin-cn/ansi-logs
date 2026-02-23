@@ -1,0 +1,82 @@
+{
+  "name": "log-lens",
+  "displayName": "Log Lens",
+  "description": "High-performance ANSI log viewer with virtual scrolling, log-level filtering, inline editing, grep filter, and tail-follow. Handles 2M+ line log files with ease.",
+  "version": "0.1.0",
+  "publisher": "bartag",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bartag/log-lens"
+  },
+  "bugs": {
+    "url": "https://github.com/bartag/log-lens/issues"
+  },
+  "homepage": "https://github.com/bartag/log-lens#readme",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["log", "ansi", "color", "viewer", "pretty", "logger", "tail", "grep", "large file"],
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "logLens.logViewer",
+        "displayName": "Log Lens",
+        "selector": [
+          { "filenamePattern": "*.log" },
+          { "filenamePattern": "*.log.*" }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "logLens.openRaw",
+        "title": "Log Lens: Open as Text Editor"
+      },
+      {
+        "command": "logLens.toggleViewer",
+        "title": "Log Lens: Toggle Log Viewer"
+      }
+    ],
+    "configuration": {
+      "title": "Log Lens",
+      "properties": {
+        "logLens.lineHeight": {
+          "type": "number",
+          "default": 22,
+          "description": "Line height in pixels for the log viewer"
+        },
+        "logLens.fontSize": {
+          "type": "number",
+          "default": 13,
+          "description": "Font size in pixels for the log viewer"
+        },
+        "logLens.fontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Font family override (leave empty to use VS Code editor font)"
+        },
+        "logLens.renderBuffer": {
+          "type": "number",
+          "default": 100,
+          "description": "Number of extra lines to render above/below the visible area"
+        }
+      }
+    }
+  },
+  "main": "./dist/extension.js",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "^16.0.0",
+    "typescript": "^4.9.0"
+  }
+}
