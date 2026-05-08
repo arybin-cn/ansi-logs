@@ -329,6 +329,7 @@
 
         // Double-click → inline edit
         row.addEventListener('dblclick', function (e) {
+            if (e.target.classList && e.target.classList.contains('row-edit-input')) { return; }
             e.stopPropagation();
             enterEditMode(vIdx, physIdx, data, row);
         });
