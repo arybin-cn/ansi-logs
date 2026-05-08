@@ -225,6 +225,7 @@ export class LogEditorProvider implements vscode.CustomEditorProvider<LogDocumen
             fontSize: cfg.get<number>('fontSize', 13),
             fontFamily: cfg.get<string>('fontFamily', ''),
             renderBuffer: cfg.get<number>('renderBuffer', 100),
+            copyOnClick: cfg.get<boolean>('copyOnClick', true),
         });
         this.handleRequestLines(state, 0, 199, [], false);
     }

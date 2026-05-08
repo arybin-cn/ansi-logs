@@ -24,7 +24,7 @@ Open any `.log` file — ANSI Logs activates automatically as the default viewer
 | Grep lines | Type in the **Filter lines** bar |
 | Search text | Ctrl+F, then F3 / Shift+F3 to navigate |
 | Edit a line | Double-click the row, type, press **Enter** |
-| Copy line | Single-click the row |
+| Copy line | Single-click the row (disable via `ansiLogs.copyOnClick`) |
 | Follow tail | Click **⬇ Tail** |
 | Open as raw text | Click **✏ Edit Raw** |
 
@@ -36,6 +36,7 @@ Open any `.log` file — ANSI Logs activates automatically as the default viewer
 | `ansiLogs.fontSize` | `13` | Font size in pixels |
 | `ansiLogs.fontFamily` | `""` | Font family (empty = VS Code editor font) |
 | `ansiLogs.renderBuffer` | `100` | Extra rows rendered outside visible area |
+| `ansiLogs.copyOnClick` | `true` | Single-click a row to copy its plain text to the clipboard |
 
 ## Performance
 

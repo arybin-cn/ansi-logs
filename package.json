@@ -64,6 +64,11 @@
           "type": "number",
           "default": 100,
           "description": "Number of extra lines to render above/below the visible area"
+        },
+        "ansiLogs.copyOnClick": {
+          "type": "boolean",
+          "default": true,
+          "description": "Single-click a row to copy its plain text to the clipboard"
         }
       }
     }

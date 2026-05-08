@@ -11,6 +11,7 @@
     let fontSize     = 13;
     let fontFamily   = '';
     let renderBuffer = 100;
+    let copyOnClick  = true;
     let levelCounts  = {};
     let activeFilter = [];       // level filter: [] = all
     let grepActive   = false;    // true when grep filter is applied
@@ -103,6 +104,7 @@
         fontSize     = msg.fontSize    ?? 13;
         fontFamily   = msg.fontFamily  || '';
         renderBuffer = msg.renderBuffer ?? 100;
+        copyOnClick  = msg.copyOnClick !== false;
         levelCounts  = msg.levelCounts || {};
 
         document.documentElement.style.setProperty('--line-height', lineHeight + 'px');
@@ -317,11 +319,13 @@
         row.appendChild(content);
 
         // Click → copy plain text
-        row.addEventListener('click', function () {
-            vscode.postMessage({ type: 'copyText', text: data.raw || '' });
-            row.classList.add('copied');
-            setTimeout(function () { row.classList.remove('copied'); }, 800);
-        });
+        if (copyOnClick) {
+            row.addEventListener('click', function () {
+                vscode.postMessage({ type: 'copyText', text: data.raw || '' });
+                row.classList.add('copied');
+                setTimeout(function () { row.classList.remove('copied'); }, 800);
+            });
+        }
 
         // Double-click → inline edit
         row.addEventListener('dblclick', function (e) {
