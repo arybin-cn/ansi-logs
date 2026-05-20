@@ -23,10 +23,22 @@
     let tailMode = false;
     let searchQuery  = '';
     let searchResults = [];
+    let searchResultSet = new Set(); // physIdx set for O(1) match lookup
     let searchIdx    = -1;
+    let physToVIdx   = null;         // lazy-built reverse index: physIdx → vIdx
     let editingVIdx  = -1;       // vIdx currently being inline-edited (-1 = none)
 
     const BATCH = 200;
+
+    function invalidatePhysToVIdx() { physToVIdx = null; }
+
+    function getPhysToVIdx() {
+        physToVIdx = new Map();
+        for (var i = 0; i < filteredLines.length; i++) {
+            if (filteredLines[i] != null) { physToVIdx.set(filteredLines[i], i); }
+        }
+        return physToVIdx;
+    }
 
     // ─── DOM refs ─────────────────────────────────────────────────────────────
     const container  = document.getElementById('log-container');
@@ -139,6 +151,7 @@
             rowCache.set(lineData.lineNum, lineData);
         });
         pendingBatches.delete(msg.start);
+        invalidatePhysToVIdx();
         renderVisible();
         updateStatus();
     }
@@ -147,8 +160,8 @@
     function onLineUpdated(msg) {
         rowCache.set(msg.lineNum, { lineNum: msg.lineNum, spans: msg.spans, level: msg.level, raw: msg.raw });
         // Find its vIdx and re-render just that row
-        const vIdx = filteredLines.indexOf(msg.lineNum);
-        if (vIdx >= 0 && renderedRows.has(vIdx)) {
+        const vIdx = getPhysToVIdx().get(msg.lineNum);
+        if (vIdx !== undefined && renderedRows.has(vIdx)) {
             const old = renderedRows.get(vIdx);
             const newRow = buildRow(vIdx, msg.lineNum, rowCache.get(msg.lineNum));
             old.replaceWith(newRow);
@@ -173,6 +186,7 @@
         rowCache.clear();
         pendingBatches.clear();
         filteredLines = [];
+        invalidatePhysToVIdx();
         filteredCount = grepActive ? 0 : computeFilteredCount();
         grepActive = false;
         grepCount.textContent = '';
@@ -311,8 +325,7 @@
 
         // Search highlight
         if (searchQuery) {
-            var isMatch = searchResults.indexOf(physIdx) !== -1;
-            if (isMatch) { row.classList.add('search-match'); }
+            if (searchResultSet.has(physIdx)) { row.classList.add('search-match'); }
             if (searchResults[searchIdx] === physIdx) { row.classList.add('search-current'); }
         }
 
@@ -501,6 +514,7 @@
         rowCache.clear();
         pendingBatches.clear();
         filteredLines = [];
+        invalidatePhysToVIdx();
         filteredCount = computeFilteredCount();
         updateLayout();
         requestRender();
@@ -547,6 +561,7 @@
         rowCache.clear();
         pendingBatches.clear();
         filteredLines = [];
+        invalidatePhysToVIdx();
         filteredCount = computeFilteredCount();
         updateLayout();
         requestRender();
@@ -556,6 +571,7 @@
     function onGrepReady(msg) {
         grepActive = msg.query !== '';
         filteredLines = [];
+        invalidatePhysToVIdx();
         filteredCount = msg.count;
         grepStatus.textContent = grepActive ? '✓' : '';
         grepCount.textContent = grepActive ? msg.count.toLocaleString() + ' matches' : '';
@@ -620,18 +636,40 @@
 
     function onSearchResults(indices) {
         searchResults = indices;
+        searchResultSet = new Set(indices);
         searchIdx = indices.length > 0 ? 0 : -1;
         updateSearchInfo();
+        // Mark search-match on already-rendered rows incrementally
+        renderedRows.forEach(function (el, vIdx) {
+            var physIdx = filteredLines[vIdx];
+            if (physIdx == null) { return; }
+            el.classList.toggle('search-match', searchResultSet.has(physIdx));
+            el.classList.toggle('search-current', physIdx === searchResults[searchIdx]);
+        });
         if (searchIdx >= 0) { scrollToPhysLine(searchResults[searchIdx]); }
-        redrawAllRows();
     }
 
     function navigateSearch(dir) {
         if (!searchResults.length) { return; }
+        var oldIdx = searchIdx;
         searchIdx = (searchIdx + dir + searchResults.length) % searchResults.length;
         updateSearchInfo();
-        scrollToPhysLine(searchResults[searchIdx]);
-        redrawAllRows();
+        // Toggle search-current class on old and new rows incrementally
+        if (oldIdx >= 0) {
+            var oldPhys = searchResults[oldIdx];
+            var oldVIdx = getPhysToVIdx().get(oldPhys);
+            if (oldVIdx !== undefined) {
+                var oldEl = renderedRows.get(oldVIdx);
+                if (oldEl) { oldEl.classList.remove('search-current'); }
+            }
+        }
+        var newPhys = searchResults[searchIdx];
+        var newVIdx = getPhysToVIdx().get(newPhys);
+        if (newVIdx !== undefined) {
+            var newEl = renderedRows.get(newVIdx);
+            if (newEl) { newEl.classList.add('search-current'); }
+        }
+        scrollToPhysLine(newPhys);
     }
 
     function updateSearchInfo() {
@@ -642,21 +680,25 @@
     function clearSearch() {
         searchQuery = '';
         searchResults = [];
+        searchResultSet = new Set();
         searchIdx = -1;
         searchInfo.textContent = '';
-        redrawAllRows();
+        // Remove search classes from rendered rows incrementally
+        renderedRows.forEach(function (el) {
+            el.classList.remove('search-match', 'search-current');
+        });
     }
 
     function scrollToPhysLine(physIdx) {
-        var vIdx = filteredLines.indexOf(physIdx);
+        var vIdx = getPhysToVIdx().get(physIdx);
+        if (vIdx === undefined) {
+            // physIdx not in filteredLines — file not fully loaded yet.
+            // Without grep, virtual index equals physical index.
+            // With grep, do a linear search through filteredLines.
+            vIdx = grepActive ? filteredLines.indexOf(physIdx) : physIdx;
+        }
         if (vIdx < 0) { return; }
         container.scrollTop = Math.max(0, vIdx * lineHeight - container.clientHeight / 2 + lineHeight / 2);
-    }
-
-    function redrawAllRows() {
-        renderedRows.forEach(function (el) { el.remove(); });
-        renderedRows.clear();
-        renderVisible();
     }
 
     // ─── Status ───────────────────────────────────────────────────────────────
