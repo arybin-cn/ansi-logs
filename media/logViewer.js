@@ -25,6 +25,9 @@
     let searchResults = [];
     let searchResultSet = new Set(); // physIdx set for O(1) match lookup
     let searchIdx    = -1;
+    let searchLoading = false;
+    let lastSearchDir = 1;
+    let currentLinePhysIdx = -1;
     let physToVIdx   = null;         // lazy-built reverse index: physIdx → vIdx
     let editingVIdx  = -1;       // vIdx currently being inline-edited (-1 = none)
 
@@ -49,6 +52,8 @@
     const filenameEl = document.getElementById('filename');
     const searchInput= document.getElementById('search-input');
     const searchInfo = document.getElementById('search-results-info');
+    const searchPrev = document.getElementById('search-prev');
+    const searchNext = document.getElementById('search-next');
     const btnTail    = document.getElementById('btn-tail');
     const grepInput  = document.getElementById('grep-input');
     const grepClear  = document.getElementById('grep-clear');
@@ -59,6 +64,16 @@
     window.addEventListener('message', handleMessage);
     vscode.postMessage({ type: 'ready' });
 
+    // Keep --header-height in sync when toolbar wraps
+    var toolbarEl = document.getElementById('toolbar');
+    var filterBarEl = document.getElementById('filter-bar');
+    function syncHeaderHeight() {
+        document.documentElement.style.setProperty('--header-height',
+            (toolbarEl.offsetHeight + filterBarEl.offsetHeight) + 'px');
+    }
+    new ResizeObserver(syncHeaderHeight).observe(toolbarEl);
+    syncHeaderHeight();
+
     // ─── Message handler ──────────────────────────────────────────────────────
     function handleMessage(event) {
         const msg = event.data;
@@ -68,6 +83,12 @@
             case 'lineUpdated': onLineUpdated(msg);                             break;
             case 'docChanged':  hideScanOverlay(); onDocChanged(msg);           break;
             case 'searchResults': onSearchResults(msg.indices);                 break;
+            case 'searchCancelled':
+                console.log('[search] searchCancelled received');
+                if (cancelTimer) { clearTimeout(cancelTimer); cancelTimer = null; }
+                cancelling = false;
+                setSearchLoading(false);
+                break;
             case 'grepReady':   onGrepReady(msg);                               break;
             case 'grepScanning':grepStatus.textContent = 'Filtering…'; break;
             case 'scanning':    showScanOverlay(msg.filename);                  break;
@@ -325,11 +346,22 @@
 
         // Search highlight
         if (searchQuery) {
-            if (searchResultSet.has(physIdx)) { row.classList.add('search-match'); }
+            if (searchResultSet.has(physIdx)) {
+                row.classList.add('search-match');
+                highlightText(content, searchQuery);
+            }
             if (searchResults[searchIdx] === physIdx) { row.classList.add('search-current'); }
         }
 
         row.appendChild(content);
+
+        // Click → set current line
+        row.addEventListener('click', function () {
+            var old = document.querySelector('.log-row.current-line');
+            if (old) { old.classList.remove('current-line'); }
+            currentLinePhysIdx = physIdx;
+            row.classList.add('current-line');
+        });
 
         // Click → copy plain text
         if (copyOnClick) {
@@ -343,6 +375,7 @@
         // Double-click → inline edit
         row.addEventListener('dblclick', function (e) {
             if (e.target.classList && e.target.classList.contains('row-edit-input')) { return; }
+            if (searchLoading) { return; }
             e.stopPropagation();
             enterEditMode(vIdx, physIdx, data, row);
         });
@@ -402,6 +435,57 @@
 
         input.addEventListener('keydown', function (e) {
             e.stopPropagation();
+
+            // Ctrl/Cmd + C: copy selected text
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                var start = input.selectionStart;
+                var end = input.selectionEnd;
+                if (start !== end) {
+                    var text = input.value.substring(start, end);
+                    navigator.clipboard.writeText(text);
+                }
+                return;
+            }
+
+            // Ctrl/Cmd + X: cut selected text
+            if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+                var start = input.selectionStart;
+                var end = input.selectionEnd;
+                if (start !== end) {
+                    var text = input.value.substring(start, end);
+                    navigator.clipboard.writeText(text);
+                    input.setRangeText('', start, end, 'end');
+                }
+                return;
+            }
+
+            // Ctrl/Cmd + V: paste from clipboard
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                e.preventDefault();
+                navigator.clipboard.readText().then(function (text) {
+                    var start = input.selectionStart;
+                    var end = input.selectionEnd;
+                    input.setRangeText(text, start, end, 'end');
+                });
+                return;
+            }
+
+            // Ctrl/Cmd + F: put selected text into search box and exit edit
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                var selectedText = '';
+                var selStart = input.selectionStart;
+                var selEnd = input.selectionEnd;
+                if (selStart !== selEnd) {
+                    selectedText = input.value.substring(selStart, selEnd);
+                }
+                cancel();
+                searchInput.value = selectedText;
+                searchInput.focus();
+                searchInput.select();
+                return;
+            }
+
             if (e.key === 'Enter') { e.preventDefault(); commit(); }
             if (e.key === 'Escape') { e.preventDefault(); cancel(); }
         });
@@ -612,41 +696,128 @@
     });
 
     // ─── Search ───────────────────────────────────────────────────────────────
-    var searchDebounce = null;
+    var searchOverlay = null;
+    var searchToast = null;
+    var savedSelStart = 0;
+    var savedSelEnd = 0;
 
-    searchInput.addEventListener('input', function () {
-        clearTimeout(searchDebounce);
-        searchDebounce = setTimeout(function () {
-            searchQuery = searchInput.value;
-            if (!searchQuery) { clearSearch(); return; }
-            vscode.postMessage({ type: 'search', query: searchQuery, filter: activeFilter, grepActive: grepActive });
-        }, 300);
-    });
+    function setSearchLoading(loading) {
+        if (loading) {
+            savedSelStart = searchInput.selectionStart;
+            savedSelEnd = searchInput.selectionEnd;
+        }
+        searchLoading = loading;
+        searchInput.disabled = loading;
+        searchPrev.disabled = loading;
+        searchNext.disabled = loading;
+        if (loading) {
+            if (!searchOverlay) {
+                searchOverlay = document.createElement('div');
+                searchOverlay.id = 'search-overlay';
+                document.body.appendChild(searchOverlay);
+            }
+            if (!searchToast) {
+                searchToast = document.createElement('div');
+                searchToast.id = 'search-toast';
+                searchToast.innerHTML =
+                    '<div class="search-toast-spinner"></div>' +
+                    '<span class="search-toast-text">Searching…</span>';
+                document.body.appendChild(searchToast);
+            }
+            searchOverlay.classList.add('visible');
+            searchToast.classList.add('visible');
+        } else {
+            if (searchOverlay) { searchOverlay.classList.remove('visible'); }
+            if (searchToast) { searchToast.classList.remove('visible'); }
+            searchInput.focus();
+            searchInput.setSelectionRange(savedSelStart, savedSelEnd);
+        }
+    }
 
-    document.getElementById('search-prev').addEventListener('click', function () { navigateSearch(-1); });
-    document.getElementById('search-next').addEventListener('click', function () { navigateSearch(1); });
+    function triggerSearch(dir) {
+        var q = searchInput.value;
+        if (!q) { clearSearch(); return; }
+        lastSearchDir = dir || 1;
+        setSearchLoading(true);
+        vscode.postMessage({ type: 'search', query: q, filter: activeFilter, grepActive: grepActive });
+    }
+
+    searchPrev.addEventListener('click', function () { navigateSearch(-1); });
+    searchNext.addEventListener('click', function () { navigateSearch(1); });
 
     document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); searchInput.focus(); searchInput.select(); }
-        if (e.key === 'Escape' && document.activeElement !== grepInput) { clearSearch(); searchInput.value = ''; }
-        if (e.key === 'F3' || (e.key === 'Enter' && document.activeElement === searchInput)) {
-            e.preventDefault(); navigateSearch(e.shiftKey ? -1 : 1);
+        if (e.key === 'Escape' && document.activeElement !== grepInput) {
+            if (!searchLoading) { clearSearch(); searchInput.value = ''; }
+        }
+        if (e.key === 'F3') {
+            e.preventDefault(); if (!searchLoading) { lastSearchDir = e.shiftKey ? -1 : 1; navigateSearch(lastSearchDir); }
+        }
+        if (e.key === 'Enter' && document.activeElement === searchInput) {
+            e.preventDefault();
+            if (searchLoading) { return; }
+            var queryChanged = searchInput.value !== searchQuery;
+            var dir = e.shiftKey ? -1 : 1;
+            if (queryChanged) {
+                triggerSearch(dir);
+            } else if (e.shiftKey) {
+                navigateSearch(-1);
+            } else if (searchResults.length) {
+                navigateSearch(1);
+            } else {
+                triggerSearch(dir);
+            }
         }
     });
 
+    function findNearestSearchIdx(indices, dir) {
+        var topPhys;
+        if (currentLinePhysIdx >= 0) {
+            topPhys = currentLinePhysIdx;
+        } else {
+            topPhys = filteredLines[Math.floor(container.scrollTop / lineHeight)];
+        }
+        if (topPhys == null) { topPhys = 0; }
+        if (dir >= 0) {
+            for (var i = 0; i < indices.length; i++) {
+                if (indices[i] >= topPhys) { return i; }
+            }
+            return 0;
+        } else {
+            for (var i = indices.length - 1; i >= 0; i--) {
+                if (indices[i] <= topPhys) { return i; }
+            }
+            return indices.length - 1;
+        }
+    }
+
     function onSearchResults(indices) {
+        if (!searchLoading) { return; }
+        setSearchLoading(false);
+        searchQuery = searchInput.value;
         searchResults = indices;
         searchResultSet = new Set(indices);
-        searchIdx = indices.length > 0 ? 0 : -1;
+        searchIdx = indices.length > 0 ? findNearestSearchIdx(indices, lastSearchDir) : -1;
         updateSearchInfo();
-        // Mark search-match on already-rendered rows incrementally
         renderedRows.forEach(function (el, vIdx) {
             var physIdx = filteredLines[vIdx];
             if (physIdx == null) { return; }
-            el.classList.toggle('search-match', searchResultSet.has(physIdx));
+            var content = el.querySelector('.row-content');
+            if (content) {
+                var marks = content.querySelectorAll('mark.search-highlight');
+                for (var i = 0; i < marks.length; i++) {
+                    marks[i].replaceWith(document.createTextNode(marks[i].textContent));
+                }
+            }
+            var match = searchResultSet.has(physIdx);
+            el.classList.toggle('search-match', match);
             el.classList.toggle('search-current', physIdx === searchResults[searchIdx]);
+            if (match && content) {
+                highlightText(content, searchQuery);
+            }
         });
         if (searchIdx >= 0) { scrollToPhysLine(searchResults[searchIdx]); }
+        searchInput.focus();
     }
 
     function navigateSearch(dir) {
@@ -654,7 +825,6 @@
         var oldIdx = searchIdx;
         searchIdx = (searchIdx + dir + searchResults.length) % searchResults.length;
         updateSearchInfo();
-        // Toggle search-current class on old and new rows incrementally
         if (oldIdx >= 0) {
             var oldPhys = searchResults[oldIdx];
             var oldVIdx = getPhysToVIdx().get(oldPhys);
@@ -672,21 +842,60 @@
         scrollToPhysLine(newPhys);
     }
 
+    function highlightText(el, query) {
+        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+        var nodes = [];
+        while (walker.nextNode()) { nodes.push(walker.currentNode); }
+        var q = query.toLowerCase();
+        for (var n = 0; n < nodes.length; n++) {
+            var node = nodes[n];
+            var text = node.textContent;
+            var lower = text.toLowerCase();
+            var pos = 0;
+            var idx = lower.indexOf(q, pos);
+            if (idx === -1) { continue; }
+            var frag = document.createDocumentFragment();
+            while (idx !== -1) {
+                if (idx > pos) { frag.appendChild(document.createTextNode(text.slice(pos, idx))); }
+                var mark = document.createElement('mark');
+                mark.className = 'search-highlight';
+                mark.textContent = text.slice(idx, idx + q.length);
+                frag.appendChild(mark);
+                pos = idx + q.length;
+                idx = lower.indexOf(q, pos);
+            }
+            if (pos < text.length) { frag.appendChild(document.createTextNode(text.slice(pos))); }
+            node.parentNode.replaceChild(frag, node);
+        }
+    }
+
     function updateSearchInfo() {
         if (!searchQuery || !searchResults.length) { searchInfo.textContent = searchQuery ? 'No results' : ''; return; }
         searchInfo.textContent = (searchIdx + 1) + ' / ' + searchResults.length;
     }
 
-    function clearSearch() {
+    function clearSearchState() {
         searchQuery = '';
         searchResults = [];
         searchResultSet = new Set();
         searchIdx = -1;
+        currentLinePhysIdx = -1;
         searchInfo.textContent = '';
-        // Remove search classes from rendered rows incrementally
+        var old = document.querySelector('.log-row.current-line');
+        if (old) { old.classList.remove('current-line'); }
         renderedRows.forEach(function (el) {
             el.classList.remove('search-match', 'search-current');
+            var marks = el.querySelectorAll('mark.search-highlight');
+            for (var i = 0; i < marks.length; i++) {
+                marks[i].replaceWith(document.createTextNode(marks[i].textContent));
+            }
         });
+    }
+
+    function clearSearch() {
+        if (searchLoading) { vscode.postMessage({ type: 'searchCancel' }); }
+        setSearchLoading(false);
+        clearSearchState();
     }
 
     function scrollToPhysLine(physIdx) {

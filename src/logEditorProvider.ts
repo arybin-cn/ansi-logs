@@ -357,7 +357,7 @@ export class LogEditorProvider implements vscode.CustomEditorProvider<LogDocumen
         }
         const physIndices = this.resolvePhysical(state, levelFilter, grepActive);
         const results: number[] = [];
-        const CHUNK = 5000;
+        const CHUNK = 1000;
 
         for (let i = 0; i < physIndices.length; i += CHUNK) {
             const batch = physIndices.slice(i, i + CHUNK);
@@ -454,17 +454,19 @@ export class LogEditorProvider implements vscode.CustomEditorProvider<LogDocumen
   </div>
   <div id="toolbar-right">
     <div id="search-wrap">
-      <input id="search-input" type="text" placeholder="Search… (Ctrl+F)" spellcheck="false" autocomplete="off">
+      <div id="search-nav">
+        <input id="search-input" type="text" placeholder="Search… (Ctrl+F)" spellcheck="false" autocomplete="off">
+        <button id="search-prev" class="icon-btn" title="Prev (Shift+F3)">▲</button>
+        <button id="search-next" class="icon-btn" title="Next (F3)">▼</button>
+      </div>
       <span id="search-results-info"></span>
-      <button id="search-prev" class="icon-btn" title="Prev (Shift+F3)">▲</button>
-      <button id="search-next" class="icon-btn" title="Next (F3)">▼</button>
     </div>
-    <button id="btn-tail" class="icon-btn" title="Follow tail">⬇ Tail</button>
-    <button id="btn-raw"  class="icon-btn" title="Open as editable text">✏ Edit Raw</button>
   </div>
 </div>
 
 <div id="filter-bar">
+  <button id="btn-tail" class="icon-btn" title="Follow tail">⬇ Tail</button>
+  <button id="btn-raw"  class="icon-btn" title="Open as editable text">✏ Edit Raw</button>
   <span class="filter-bar-label">Filter lines:</span>
   <input id="grep-input" type="text" placeholder="Contains text… (Enter to apply)" spellcheck="false" autocomplete="off">
   <button id="grep-clear" class="icon-btn small" title="Clear filter">✕</button>

@@ -15,8 +15,8 @@
     --toolbar-bg: var(--vscode-sideBar-background, #21252b);
     --hover-bg: var(--vscode-list-hoverBackground, rgba(255,255,255,0.06));
     --selection-bg: var(--vscode-editor-selectionBackground, rgba(67,129,193,0.4));
-    --highlight-bg: rgba(255,218,0,0.25);
-    --highlight-current: rgba(255,170,0,0.6);
+    --highlight-bg: rgba(255,218,0,0.12);
+    --highlight-current: rgba(255,170,0,0.3);
     --input-bg: var(--vscode-input-background, #1d1f23);
     --input-fg: var(--vscode-input-foreground, #abb2bf);
     --btn-bg: var(--vscode-button-secondaryBackground, #2c313a);
@@ -47,12 +47,12 @@ html, body {
     display: flex;
     align-items: center;
     gap: 8px;
-    height: var(--toolbar-height);
-    padding: 0 10px;
+    min-height: var(--toolbar-height);
+    padding: 4px 16px;
     background: var(--toolbar-bg);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    overflow: hidden;
+    flex-wrap: wrap;
     user-select: none;
 }
 
@@ -67,7 +67,6 @@ html, body {
 #toolbar-center {
     display: flex;
     align-items: center;
-    flex: 1;
     justify-content: center;
     min-width: 0;
 }
@@ -75,8 +74,9 @@ html, body {
 #toolbar-right {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
+    gap: 2px;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
 }
 
 .filename {
@@ -150,7 +150,7 @@ html, body {
 
 /* ─── Icon buttons ────────────────────────────────────────────────────────── */
 .icon-btn {
-    padding: 3px 9px;
+    padding: 4px 9px;
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--btn-bg);
@@ -169,12 +169,19 @@ html, body {
 #search-wrap {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
+    flex-wrap: wrap;
+}
+
+#search-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
 #search-input {
     width: 180px;
-    padding: 3px 8px;
+    padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--input-bg);
@@ -197,8 +204,72 @@ html, body {
 }
 
 #search-prev, #search-next {
-    padding: 2px 7px;
+    padding: 4px 6px;
     font-size: 10px;
+}
+
+#search-input:disabled, #search-prev:disabled, #search-next:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Search overlay + toast */
+#search-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.06);
+    z-index: 99;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+#search-overlay.visible {
+    opacity: 1;
+}
+
+#search-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--toolbar-bg, #21252b);
+    border: 1px solid var(--active-btn);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+#search-toast.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+}
+
+.search-toast-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--active-btn);
+    border-radius: 50%;
+    animation: search-spin 0.7s linear infinite;
+}
+
+@keyframes search-spin {
+    to { transform: rotate(360deg); }
+}
+
+.search-toast-text {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg);
 }
 
 /* ─── Log container ──────────────────────────────────────────────────────── */
@@ -295,6 +366,13 @@ html, body {
 /* Search highlight */
 .log-row.search-match   { background: var(--highlight-bg) !important; }
 .log-row.search-current { background: var(--highlight-current) !important; }
+.log-row.current-line   { background: var(--selection-bg) !important; }
+mark.search-highlight {
+    background: rgba(255,218,0,0.25);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}
 
 /* Gutter (line number) */
 .gutter {
@@ -329,7 +407,7 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 12px;
+    padding: 4px 16px;
     background: var(--vscode-statusBar-background, #21252b);
     border-top: 1px solid var(--border);
     font-size: 11px;
@@ -365,7 +443,7 @@ html, body {
     align-items: center;
     gap: 6px;
     height: 32px;
-    padding: 0 10px;
+    padding: 4px 16px;
     background: var(--toolbar-bg);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
@@ -381,7 +459,7 @@ html, body {
 
 #grep-input {
     width: 220px;
-    padding: 2px 8px;
+    padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--input-bg);
@@ -397,7 +475,7 @@ html, body {
 }
 
 .icon-btn.small {
-    padding: 1px 6px;
+    padding: 2px 6px;
     font-size: 10px;
 }
 
