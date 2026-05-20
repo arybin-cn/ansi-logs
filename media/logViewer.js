@@ -393,9 +393,14 @@
             if (e.key === 'Escape') { e.preventDefault(); cancel(); }
         });
 
-        // Blur → cancel (don't auto-save, too risky for log files)
+        // Custom context menu — keeps focus on input so selection stays visible
+        input.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            showContextMenu(e.clientX, e.clientY, input);
+        });
+
         input.addEventListener('blur', function () {
-            setTimeout(cancel, 150); // delay so Enter click doesn't race
+            setTimeout(cancel, 150);
         });
     }
 
@@ -410,6 +415,59 @@
         currentEditInput = null;
         editingVIdx = -1;
     }
+
+    // ─── Context menu ──────────────────────────────────────────────────────────
+    var activeContextMenu = null;
+
+    function hideContextMenu() {
+        if (activeContextMenu) { activeContextMenu.remove(); activeContextMenu = null; }
+    }
+
+    function showContextMenu(x, y, input) {
+        hideContextMenu();
+        var hasSelection = input.selectionStart !== input.selectionEnd;
+        var menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+
+        var items = [
+            { label: 'Cut',     action: function () { document.execCommand('cut'); },     disabled: !hasSelection },
+            { label: 'Copy',    action: function () { document.execCommand('copy'); },    disabled: !hasSelection },
+            { label: 'Paste',   action: function () {
+                navigator.clipboard.readText().then(function (text) {
+                    document.execCommand('insertText', false, text);
+                });
+            }},
+            { label: 'Select All', action: function () { input.select(); } }
+        ];
+
+        items.forEach(function (item) {
+            var el = document.createElement('div');
+            el.className = 'context-menu-item' + (item.disabled ? ' disabled' : '');
+            el.textContent = item.label;
+            el.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            el.addEventListener('click', function () {
+                hideContextMenu();
+                input.focus();
+                item.action();
+            });
+            menu.appendChild(el);
+        });
+
+        document.body.appendChild(menu);
+        activeContextMenu = menu;
+
+        // Adjust position if menu goes off-screen
+        var rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) { menu.style.left = (x - rect.width) + 'px'; }
+        if (rect.bottom > window.innerHeight) { menu.style.top = (y - rect.height) + 'px'; }
+    }
+
+    document.addEventListener('click', hideContextMenu);
+    document.addEventListener('contextmenu', function (e) {
+        if (!e.target.classList.contains('row-edit-input')) { hideContextMenu(); }
+    });
 
     // ─── Filter buttons ────────────────────────────────────────────────────────
     document.querySelectorAll('.filter-btn').forEach(function (btn) {
