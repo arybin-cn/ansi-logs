@@ -101,7 +101,7 @@ function stateToStyle(s: State): string {
     return parts.join(';');
 }
 
-const ANSI_RE = /\x1b\[([\d;]*)m|\x1b\][\s\S]*?(?:\x1b\\|\x07)|\x1b[A-Z]/g;
+const ANSI_RE = /\x1b\[([\d;:]*)m|\x1b\][\s\S]*?(?:\x1b\\|\x07)|\x1b[A-Z]/g;
 
 export function parseAnsiLine(line: string): AnsiSpan[] {
     const spans: AnsiSpan[] = [];
@@ -123,7 +123,8 @@ export function parseAnsiLine(line: string): AnsiSpan[] {
         // Only process SGR (CSI ... m) sequences
         if (!m[1] && m[1] !== '') { continue; }
 
-        const params = m[1] ? m[1].split(';').map(Number) : [0];
+        // Split on semicolons, then expand colon-separated sub-parameters
+        const params = m[1] ? m[1].split(';').flatMap(p => p.split(':').map(Number)) : [0];
         let i = 0;
         while (i < params.length) {
             const p = params[i];
@@ -195,7 +196,7 @@ export function parseAnsiLine(line: string): AnsiSpan[] {
 }
 
 export function stripAnsi(text: string): string {
-    return text.replace(/\x1b\[[\d;]*[A-Za-z]|\x1b\][\s\S]*?(?:\x1b\\|\x07)|\x1b./g, '');
+    return text.replace(/\x1b\[[\d;:]*[A-Za-z]|\x1b\][\s\S]*?(?:\x1b\\|\x07)|\x1b./g, '');
 }
 
 /** Detect log level from a raw line (before or after ANSI stripping) */
